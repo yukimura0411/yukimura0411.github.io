@@ -1,489 +1,474 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TaskFlow - Vanilla TypeScript</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in {
-            animation: fadeIn 0.2s ease-out forwards;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>シンプルタスク管理アプリ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
 
-    <header class="bg-white shadow-sm sticky top-0 z-20">
-        <div class="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-2 text-indigo-600">
-                <svg class="w-6 h-6 fill-indigo-100" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-                <h1 class="text-xl font-bold tracking-tight">TaskFlow (Vanilla TS)</h1>
-            </div>
-            
-            <!-- 通知ベルアイコン -->
-            <div class="relative">
-                <button id="notification-btn" class="p-2 rounded-full hover:bg-slate-100 transition-colors relative">
-                    <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-                    <span id="notification-badge" class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white hidden">0</span>
-                </button>
-
-                <!-- 通知ドロップダウン -->
-                <div id="notification-dropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-50">
-                    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
-                        <span class="font-semibold text-sm">通知</span>
-                        <button id="clear-notifications-btn" class="text-xs text-slate-500 hover:text-slate-700">すべてクリア</button>
-                    </div>
-                    <div id="notification-list" class="max-h-80 overflow-y-auto">
-                        <div class="p-4 text-center text-sm text-slate-500">通知はありません</div>
-                    </div>
-                </div>
-            </div>
+  <!-- ヘッダー -->
+  <header class="bg-white shadow-sm sticky top-0 z-10">
+    <div class="max-w-2xl mx-auto px-4 py-4 flex justify-between items-center">
+      <h1 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+        <span>📝</span> タスクマネージャー
+      </h1>
+      <!-- 通知ベル -->
+      <div class="relative">
+        <button id="notification-bell" class="p-2 rounded-full hover:bg-gray-100 relative focus:outline-none">
+          🔔
+          <span id="notification-badge" class="absolute top-0 right-0 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center hidden">0</span>
+        </button>
+        <!-- 通知ドロップダウン -->
+        <div id="notification-dropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-100 z-20 overflow-hidden">
+          <div class="bg-gray-50 px-4 py-2 border-b text-xs font-semibold text-gray-500">通知バナー</div>
+          <div id="notification-list" class="max-h-60 overflow-y-auto divide-y divide-gray-100">
+            <div class="p-4 text-xs text-gray-400 text-center">通知はありません</div>
+          </div>
         </div>
-    </header>
-
-    <main class="max-w-3xl mx-auto px-4 py-8">
-        
-        <!-- タスク追加フォーム -->
-        <section class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 mb-8">
-            <form id="task-form" class="flex flex-col gap-4">
-                <div>
-                    <input
-                        type="text"
-                        id="task-title-input"
-                        placeholder="新しいタスクを入力..."
-                        class="w-full text-lg font-medium bg-transparent border-0 border-b-2 border-slate-100 focus:border-indigo-500 focus:ring-0 px-0 py-2 placeholder:text-slate-300 transition-colors"
-                        required
-                    />
-                </div>
-                <div class="flex flex-wrap gap-4 items-end">
-                    <div class="flex-1 min-w-[200px]">
-                        <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1.5">
-                            締め切り日時 <span class="text-red-500">*</span>
-                        </label>
-                        <input
-                            type="datetime-local"
-                            id="task-due-input"
-                            class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                            required
-                        />
-                    </div>
-                    <div class="flex-1 min-w-[200px]">
-                        <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1.5">
-                            メモ (任意)
-                        </label>
-                        <input
-                            type="text"
-                            id="task-memo-input"
-                            placeholder="詳細やリンクなど"
-                            class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        />
-                    </div>
-                    <button
-                        type="submit"
-                        class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-lg flex items-center gap-2 transition-colors h-[42px]"
-                    >
-                        <span>追加</span>
-                    </button>
-                </div>
-            </form>
-        </section>
-
-        <!-- 未完了タスク一覧 -->
-        <section class="mb-10">
-            <h2 class="text-sm font-bold text-slate-400 mb-3 ml-1 flex items-center gap-2">
-                未完了タスク
-                <span id="uncompleted-count" class="bg-slate-200 text-slate-600 py-0.5 px-2 rounded-full text-xs">0</span>
-            </h2>
-
-            <div id="uncompleted-task-list" class="flex flex-col gap-3">
-                <!-- 動的生成 -->
-            </div>
-        </section>
-
-        <!-- 完了済みタスクセクション -->
-        <section id="completed-section" class="hidden">
-            <button 
-                id="toggle-completed-btn"
-                class="w-full flex items-center justify-between p-4 bg-slate-200/50 hover:bg-slate-200 text-slate-600 rounded-xl font-medium transition-colors"
-            >
-                <div class="flex items-center gap-2">
-                    <span id="completed-count-label">完了済みタスク (0)</span>
-                </div>
-                <svg id="completed-chevron" class="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-            </button>
-
-            <div id="completed-task-list" class="mt-3 flex flex-col gap-2 pl-2 border-l-2 border-slate-200 ml-2 hidden">
-                <!-- 動的生成 -->
-            </div>
-        </section>
-    </main>
-
-    <!-- 編集モーダル -->
-    <div id="edit-modal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in">
-            <div class="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50">
-                <h3 class="font-bold text-slate-700">タスクの編集</h3>
-                <button id="close-modal-btn" class="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-200 transition-colors">✕</button>
-            </div>
-            
-            <form id="edit-form" class="p-5 flex flex-col gap-4">
-                <input type="hidden" id="edit-id" />
-                <div>
-                    <label class="block text-xs font-semibold text-slate-500 mb-1">タイトル <span class="text-red-500">*</span></label>
-                    <input type="text" id="edit-title" class="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" required />
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-500 mb-1">締め切り日時 <span class="text-red-500">*</span></label>
-                    <input type="datetime-local" id="edit-due" class="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" required />
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-500 mb-1">メモ</label>
-                    <textarea id="edit-memo" class="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 min-h-[80px]"></textarea>
-                </div>
-                <div class="mt-4 flex gap-3 justify-end">
-                    <button type="button" id="cancel-edit-btn" class="px-4 py-2 font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">キャンセル</button>
-                    <button type="submit" class="px-4 py-2 font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors">保存する</button>
-                </div>
-            </form>
-        </div>
+      </div>
     </div>
+  </header>
 
-    <script>
-        // TypeScript/JavaScript application runtime
-        interface Task {
-            id: string;
-            title: string;
-            memo: string;
-            dueAt: string;
-            completed: boolean;
-            completedAt?: string;
-            remindBefore: number[];
-            notified: number[];
-            createdAt: string;
-        }
+  <!-- メインコンテンツ -->
+  <main class="max-w-2xl w-full mx-auto px-4 py-6 flex-grow space-y-6">
 
-        interface AppNotification {
-            id: string;
-            taskId: string;
-            message: string;
-            read: boolean;
-            createdAt: string;
-        }
+    <!-- タスク追加フォーム -->
+    <section class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <h2 class="text-sm font-semibold text-gray-700 mb-3">新しいタスクを追加</h2>
+      <form id="task-form" class="space-y-3">
+        <div>
+          <input type="text" id="task-title" required placeholder="タスクのタイトル (必須)" maxlength="100"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div class="flex gap-2">
+          <div class="flex-1">
+            <input type="datetime-local" id="task-due" required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition shrink-0">
+            追加
+          </button>
+        </div>
+        <div>
+          <textarea id="task-memo" placeholder="メモ (任意)" rows="2"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+        </div>
+      </form>
+    </section>
 
-        // 状態管理
-        let tasks: Task[] = JSON.parse(localStorage.getItem('taskManager_tasks') || '[]');
-        let notifications: AppNotification[] = JSON.parse(localStorage.getItem('taskManager_notifications') || '[]');
-        let isCompletedExpanded = false;
+    <!-- 未完了タスク一覧 -->
+    <section class="space-y-3">
+      <div class="flex justify-between items-center">
+        <h2 class="text-sm font-semibold text-gray-700">未完了タスク</h2>
+        <button id="request-permission-btn" class="text-xs text-blue-600 hover:underline hidden">
+          🔔 ブラウザ通知を有効にする
+        </button>
+      </div>
+      <div id="active-task-list" class="space-y-2">
+        <!-- JSで動的に挿入 -->
+      </div>
+    </section>
 
-        // ローカル時間文字列の生成（input type="datetime-local"用）
-        function getNowLocalString(): string {
-            const now = new Date();
-            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-            return now.toISOString().slice(0, 16);
-        }
+    <!-- 完了済みタスク（折りたたみ） -->
+    <section class="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+      <button id="toggle-completed-btn" class="w-full px-4 py-3 bg-gray-50 flex justify-between items-center text-sm font-semibold text-gray-600 hover:bg-gray-100 transition">
+        <span id="completed-header-text">完了済みタスク (0)</span>
+        <span id="completed-arrow" class="transform transition-transform">▼</span>
+      </button>
+      <div id="completed-container" class="hidden p-4 space-y-2 border-t border-gray-100">
+        <div id="completed-task-list" class="space-y-2">
+          <!-- JSで動的に挿入 -->
+        </div>
+      </div>
+    </section>
 
-        // 初期セット
-        document.getElementById('task-due-input')!.setAttribute('value', getNowLocalString());
+  </main>
 
-        // 通知権限の要求
-        if ('Notification' in window && Notification.permission === 'default') {
-            Notification.requestPermission();
-        }
+  <!-- 編集モーダル -->
+  <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <h3 class="text-lg font-bold text-gray-900">タスクの編集</h3>
+      <form id="edit-form" class="space-y-3">
+        <input type="hidden" id="edit-id">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">タイトル</label>
+          <input type="text" id="edit-title" required maxlength="100"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">締め切り日時</label>
+          <input type="datetime-local" id="edit-due" required
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">メモ</label>
+          <textarea id="edit-memo" rows="2"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" id="edit-cancel-btn" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
+            キャンセル
+          </button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
+            保存
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-        // 保存ヘルパー
-        function saveToStorage() {
-            localStorage.setItem('taskManager_tasks', JSON.stringify(tasks));
-            localStorage.setItem('taskManager_notifications', JSON.stringify(notifications));
-            render();
-        }
+  <!-- スクリプト -->
+  <script>
+    // ローカルストレージのキー
+    const STORAGE_KEY = 'simple_tasks_v1';
 
-        // 残り時間計算
-        function calculateTimeRemaining(dueAtStr: string) {
-            const now = new Date().getTime();
-            const due = new Date(dueAtStr).getTime();
-            const diffMs = due - now;
+    // 状態管理
+    let tasks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    let showCompleted = false;
 
-            if (diffMs < 0) {
-                return { text: "期限切れ", status: "expired" };
-            }
+    // DOM要素
+    const taskForm = document.getElementById('task-form');
+    const taskTitleInput = document.getElementById('task-title');
+    const taskDueInput = document.getElementById('task-due');
+    const taskMemoInput = document.getElementById('task-memo');
+    const activeTaskList = document.getElementById('active-task-list');
+    const completedTaskList = document.getElementById('completed-task-list');
+    const toggleCompletedBtn = document.getElementById('toggle-completed-btn');
+    const completedContainer = document.getElementById('completed-container');
+    const completedHeaderText = document.getElementById('completed-header-text');
+    const completedArrow = document.getElementById('completed-arrow');
+    
+    const editModal = document.getElementById('edit-modal');
+    const editForm = document.getElementById('edit-form');
+    const editIdInput = document.getElementById('edit-id');
+    const editTitleInput = document.getElementById('edit-title');
+    const editDueInput = document.getElementById('edit-due');
+    const editMemoInput = document.getElementById('edit-memo');
+    const editCancelBtn = document.getElementById('edit-cancel-btn');
 
-            const diffMins = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMins / 60);
-            const diffDays = Math.floor(diffHours / 24);
+    const notificationBell = document.getElementById('notification-bell');
+    const notificationBadge = document.getElementById('notification-badge');
+    const notificationDropdown = document.getElementById('notification-dropdown');
+    const notificationList = document.getElementById('notification-list');
+    const requestPermissionBtn = document.getElementById('request-permission-btn');
 
-            if (diffHours < 24) {
-                if (diffMins < 60) return { text: `あと${diffMins}分`, status: "urgent" };
-                return { text: `あと${diffHours}時間`, status: "urgent" };
-            }
-            
-            return { text: `あと${diffDays}日${diffHours % 24}時間`, status: "normal" };
-        }
+    // 初期化
+    function init() {
+      // 日付の初期値を現在日時の1時間後にセット
+      const now = new Date();
+      now.setHours(now.getHours() + 1);
+      taskDueInput.value = formatDateTimeLocal(now);
 
-        // フォーム送信（タスク追加）
-        document.getElementById('task-form')!.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const titleInput = document.getElementById('task-title-input') as HTMLInputElement;
-            const dueInput = document.getElementById('task-due-input') as HTMLInputElement;
-            const memoInput = document.getElementById('task-memo-input') as HTMLInputElement;
+      setupEventListeners();
+      render();
+      checkNotificationPermission();
 
-            if (!titleInput.value.trim() || !dueInput.value) return;
-
-            const newTask: Task = {
-                id: Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
-                title: titleInput.value.trim(),
-                memo: memoInput.value.trim(),
-                dueAt: new Date(dueInput.value).toISOString(),
-                completed: false,
-                remindBefore: [1440, 60], // 24時間前と1時間前
-                notified: [],
-                createdAt: new Date().toISOString()
-            };
-
-            tasks.push(newTask);
-            titleInput.value = '';
-            memoInput.value = '';
-            dueInput.value = getNowLocalString();
-            saveToStorage();
-        });
-
-        // タスク操作のグローバル関数
-        (window as any).toggleTask = (id: string) => {
-            tasks = tasks.map(t => {
-                if (t.id === id) {
-                    const nextCompleted = !t.completed;
-                    return { ...t, completed: nextCompleted, completedAt: nextCompleted ? new Date().toISOString() : undefined };
-                }
-                return t;
-            });
-            saveToStorage();
-        };
-
-        (window as any).deleteTask = (id: string) => {
-            tasks = tasks.filter(t => t.id !== id);
-            notifications = notifications.filter(n => n.taskId !== id);
-            saveToStorage();
-        };
-
-        (window as any).openEditModal = (id: string) => {
-            const task = tasks.find(t => t.id === id);
-            if (!task) return;
-
-            const localIso = new Date(task.dueAt);
-            localIso.setMinutes(localIso.getMinutes() - localIso.getTimezoneOffset());
-
-            (document.getElementById('edit-id') as HTMLInputElement).value = task.id;
-            (document.getElementById('edit-title') as HTMLInputElement).value = task.title;
-            (document.getElementById('edit-due') as HTMLInputElement).value = localIso.toISOString().slice(0, 16);
-            (document.getElementById('edit-memo') as HTMLTextAreaElement).value = task.memo;
-
-            document.getElementById('edit-modal')!.classList.remove('hidden');
-        };
-
-        document.getElementById('cancel-edit-btn')!.addEventListener('click', () => {
-            document.getElementById('edit-modal')!.classList.add('hidden');
-        });
-        document.getElementById('close-modal-btn')!.addEventListener('click', () => {
-            document.getElementById('edit-modal')!.classList.add('hidden');
-        });
-
-        document.getElementById('edit-form')!.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const id = (document.getElementById('edit-id') as HTMLInputElement).value;
-            const title = (document.getElementById('edit-title') as HTMLInputElement).value;
-            const due = (document.getElementById('edit-due') as HTMLInputElement).value;
-            const memo = (document.getElementById('edit-memo') as HTMLTextAreaElement).value;
-
-            tasks = tasks.map(t => t.id === id ? {
-                ...t,
-                title: title.trim(),
-                dueAt: new Date(due).toISOString(),
-                memo: memo.trim()
-            } : t);
-
-            document.getElementById('edit-modal')!.classList.add('hidden');
-            saveToStorage();
-        });
-
-        // 通知開閉とクリア
-        const notificationBtn = document.getElementById('notification-btn')!;
-        const notificationDropdown = document.getElementById('notification-dropdown')!;
-
-        notificationBtn.addEventListener('click', () => {
-            notificationDropdown.classList.toggle('hidden');
-            if (!notificationDropdown.classList.contains('hidden')) {
-                notifications = notifications.map(n => ({ ...n, read: true }));
-                saveToStorage();
-            }
-        });
-
-        document.getElementById('clear-notifications-btn')!.addEventListener('click', () => {
-            notifications = [];
-            saveToStorage();
-        });
-
-        // 完了済みセクションの折りたたみ切り替え
-        document.getElementById('toggle-completed-btn')!.addEventListener('click', () => {
-            isCompletedExpanded = !isCompletedExpanded;
-            const list = document.getElementById('completed-task-list')!;
-            const chevron = document.getElementById('completed-chevron')!;
-            if (isCompletedExpanded) {
-                list.classList.remove('hidden');
-                chevron.style.transform = 'rotate(180deg)';
-            } else {
-                list.classList.add('hidden');
-                chevron.style.transform = 'rotate(0deg)';
-            }
-        });
-
-        // 1分ごとのリマインダー監視ループ
-        setInterval(() => {
-            const now = new Date().getTime();
-            let updated = false;
-
-            tasks.forEach(task => {
-                if (task.completed) return;
-                const dueTime = new Date(task.dueAt).getTime();
-
-                task.remindBefore.forEach(remindMin => {
-                    const triggerTime = dueTime - (remindMin * 60 * 1000);
-                    if (now >= triggerTime && !task.notified.includes(remindMin)) {
-                        const timeText = remindMin >= 60 ? `${remindMin / 60}時間` : `${remindMin}分`;
-                        const msg = `タスク「${task.title}」の締め切りが約${timeText}後に迫っています。`;
-
-                        if ('Notification' in window && Notification.permission === 'granted') {
-                            new Notification("タスクリマインダー", { body: msg });
-                        }
-
-                        notifications.unshift({
-                            id: Math.random().toString(36).substring(2, 9),
-                            taskId: task.id,
-                            message: msg,
-                            read: false,
-                            createdAt: new Date().toISOString()
-                        });
-
-                        task.notified.push(remindMin);
-                        updated = true;
-                    }
-                });
-            });
-
-            if (updated) saveToStorage();
-        }, 60000);
-
-        // 描画エンジン (Render)
-        function render() {
-            // 未完了タスクのソート（締め切りが近い順）
-            const uncompleted = tasks.filter(t => !t.completed).sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
-            const completed = tasks.filter(t => t.completed).sort((a, b) => new Date(b.completedAt || 0).getTime() - new Date(a.completedAt || 0).getTime());
-
-            // カウント更新
-            document.getElementById('uncompleted-count')!.textContent = uncompleted.length.toString();
-            
-            // 未完了リストの描画
-            const uncompletedListEl = document.getElementById('uncompleted-task-list')!;
-            if (uncompleted.length === 0) {
-                uncompletedListEl.innerHTML = `
-                    <div class="text-center py-12 bg-white rounded-2xl border border-slate-100 border-dashed text-slate-400">
-                        <p>すべてのタスクが完了しています！素晴らしいです👏</p>
-                    </div>`;
-            } else {
-                uncompletedListEl.innerHTML = uncompleted.map(task => {
-                    const { text: timeText, status: timeStatus } = calculateTimeRemaining(task.dueAt);
-                    let cardStyle = "bg-white border-slate-200 hover:border-slate-300";
-                    let badgeStyle = "bg-slate-100 text-slate-600";
-
-                    if (timeStatus === 'expired') {
-                        cardStyle = "bg-red-50 border-red-200 shadow-sm shadow-red-100/50";
-                        badgeStyle = "bg-red-500 text-white shadow-sm shadow-red-200";
-                    } else if (timeStatus === 'urgent') {
-                        cardStyle = "bg-orange-50/50 border-orange-200 shadow-sm shadow-orange-100/50";
-                        badgeStyle = "bg-orange-500 text-white shadow-sm shadow-orange-200";
-                    }
-
-                    return `
-                        <div class="group flex items-start gap-3 p-4 rounded-xl border transition-all duration-200 ${cardStyle}">
-                            <button onclick="toggleTask('${task.id}')" class="mt-0.5 shrink-0 text-slate-300 hover:text-indigo-500 transition-colors">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/></svg>
-                            </button>
-                            <div class="flex-1 min-w-0">
-                                <div class="flex flex-wrap items-start justify-between gap-2 mb-1">
-                                    <h3 class="font-semibold text-base break-words pr-2 ${timeStatus === 'expired' ? 'text-red-900' : 'text-slate-800'}">${escapeHtml(task.title)}</h3>
-                                    <span class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold ${badgeStyle}">
-                                        ${timeText}
-                                    </span>
-                                </div>
-                                ${task.memo ? `<p class="text-sm text-slate-500 mb-2 truncate">${escapeHtml(task.memo)}</p>` : ''}
-                                <div class="flex items-center text-xs text-slate-400 font-medium">
-                                    ${new Date(task.dueAt).toLocaleString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                </div>
-                            </div>
-                            <div class="flex flex-col gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onclick="openEditModal('${task.id}')" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors" title="編集">✏️</button>
-                                <button onclick="deleteTask('${task.id}')" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="削除">🗑️</button>
-                            </div>
-                        </div>`;
-                }).join('');
-            }
-
-            // 完了済みセクションの描画
-            const completedSection = document.getElementById('completed-section')!;
-            if (completed.length > 0) {
-                completedSection.classList.remove('hidden');
-                document.getElementById('completed-count-label')!.textContent = `完了済みタスク (${completed.length})`;
-                document.getElementById('completed-task-list')!.innerHTML = completed.map(task => `
-                    <div class="flex items-center gap-3 p-3 bg-white/50 rounded-lg border border-transparent hover:border-slate-200 group">
-                        <button onclick="toggleTask('${task.id}')" class="text-indigo-500 shrink-0 hover:text-slate-400 transition-colors">✅</button>
-                        <div class="flex-1 min-w-0 opacity-60">
-                            <h3 class="line-through text-slate-600 truncate">${escapeHtml(task.title)}</h3>
-                        </div>
-                        <button onclick="deleteTask('${task.id}')" class="p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all shrink-0">🗑️</button>
-                    </div>`).join('');
-            } else {
-                completedSection.classList.add('hidden');
-            }
-
-            // 通知バッジの描画
-            const unreadCount = notifications.filter(n => !n.read).length;
-            const badge = document.getElementById('notification-badge')!;
-            if (unreadCount > 0) {
-                badge.textContent = unreadCount.toString();
-                badge.classList.remove('hidden');
-            } else {
-                badge.classList.add('hidden');
-            }
-
-            // 通知リストの描画
-            const notifListEl = document.getElementById('notification-list')!;
-            if (notifications.length === 0) {
-                notifListEl.innerHTML = `<div class="p-4 text-center text-sm text-slate-500">通知はありません</div>`;
-            } else {
-                notifListEl.innerHTML = notifications.map(n => `
-                    <div class="p-4 border-b border-slate-50 text-sm ${n.read ? 'opacity-70' : 'bg-blue-50/50'}">
-                        <div class="flex items-start gap-2">
-                            <div>
-                                <p class="text-slate-700">${escapeHtml(n.message)}</p>
-                                <span class="text-xs text-slate-400 mt-1 block">${new Date(n.createdAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</span>
-                            </div>
-                        </div>
-                    </div>`).join('');
-            }
-        }
-
-        function escapeHtml(str: string): string {
-            return str.replace(/[&<>"\']instagood/g, (tag) => {
-                const chars: {[key: string]: string} = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-                return chars[tag] || tag;
-            });
-        }
-
-        // 初回描画
+      // 1分ごとに再描画（残り時間の更新用）
+      setInterval(() => {
         render();
-    </script>
+        checkReminders();
+      }, 60000);
+    }
+
+    // 日時を datetime-local 形式に変換
+    function formatDateTimeLocal(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+
+    // イベントリスナーの設定
+    function setupEventListeners() {
+      taskForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const title = taskTitleInput.value.trim();
+        const dueAt = taskDueInput.value;
+        const memo = taskMemoInput.value.trim();
+
+        if (!title || !dueAt) return;
+
+        const newTask = {
+          id: '_' + Math.random().toString(36).substr(2, 9),
+          title,
+          memo,
+          dueAt,
+          completed: false,
+          completedAt: null,
+          remindBefore: [1440, 60], // 24時間前, 1時間前
+          notified: [],
+          createdAt: new Date().toISOString()
+        };
+
+        tasks.push(newTask);
+        saveAndRender();
+
+        // フォームリセット
+        taskTitleInput.value = '';
+        taskMemoInput.value = '';
+      });
+
+      toggleCompletedBtn.addEventListener('click', () => {
+        showCompleted = !showCompleted;
+        if (showCompleted) {
+          completedContainer.classList.remove('hidden');
+          completedArrow.classList.add('rotate-180');
+        } else {
+          completedContainer.classList.add('hidden');
+          completedArrow.classList.remove('rotate-180');
+        }
+      });
+
+      editCancelBtn.addEventListener('click', () => {
+        editModal.classList.add('hidden');
+      });
+
+      editForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = editIdInput.value;
+        const task = tasks.find(t => t.id === id);
+        if (task) {
+          task.title = editTitleInput.value.trim();
+          task.dueAt = editDueInput.value;
+          task.memo = editMemoInput.value.trim();
+          saveAndRender();
+          editModal.classList.add('hidden');
+        }
+      });
+
+      // 通知ベルの開閉
+      notificationBell.addEventListener('click', () => {
+        notificationDropdown.classList.toggle('hidden');
+      });
+
+      // 外部クリックで通知ドロップダウンを閉じる
+      window.addEventListener('click', (e) => {
+        if (!notificationBell.contains(e.target) && !notificationDropdown.contains(e.target)) {
+          notificationDropdown.classList.add('hidden');
+        }
+      });
+
+      requestPermissionBtn.addEventListener('click', () => {
+        if ('Notification' in window) {
+          Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+              requestPermissionBtn.classList.add('hidden');
+              new Notification('通知が有効化されました', { body: '期限が近づいたタスクをお知らせします。' });
+            }
+          });
+        }
+      });
+    }
+
+    function saveTasks() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    }
+
+    function saveAndRender() {
+      saveTasks();
+      render();
+    }
+
+    // 残り時間の計算と表示文字列の生成
+    function getRemainingTimeText(dueAtStr) {
+      const now = new Date();
+      const due = new Date(dueAtStr);
+      const diffMs = due.getTime() - now.getTime();
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+      if (diffMinutes < 0) {
+        const absMin = Math.abs(diffMinutes);
+        const hours = Math.floor(absMin / 60);
+        const days = Math.floor(hours / 24);
+        if (days > 0) return `期限切れ (${days}日前)`;
+        if (hours > 0) return `期限切れ (${hours}時間前)`;
+        return `期限切れ (${absMin}分前)`;
+      }
+
+      const days = Math.floor(diffMinutes / (60 * 24));
+      const hours = Math.floor((diffMinutes % (60 * 24)) / 60);
+      const minutes = diffMinutes % 60;
+
+      if (days > 0) {
+        return `あと ${days}日 ${hours}時間`;
+      } else if (hours > 0) {
+        return `あと ${hours}時間 ${minutes}分`;
+      } else {
+        return `あと ${minutes}分`;
+      }
+    }
+
+    // 描画処理
+    function render() {
+      // 未完了タスクを締め切り順（昇順）に並び替え
+      const activeTasks = tasks.filter(t => !t.completed).sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
+      const completedTasks = tasks.filter(t => t.completed).sort((a, b) => new Date(b.completedAt || 0).getTime() - new Date(a.completedAt || 0).getTime());
+
+      // 未完了タスクの描画
+      if (activeTasks.length === 0) {
+        activeTaskList.innerHTML = `<div class="p-6 bg-white rounded-xl border border-gray-100 text-center text-sm text-gray-400">タスクはありません</div>`;
+      } else {
+        activeTaskList.innerHTML = activeTasks.map(task => {
+          const isOverdue = new Date(task.dueAt).getTime() < Date.now();
+          const timeText = getRemainingTimeText(task.dueAt);
+          
+          let badgeClass = 'bg-blue-50 text-blue-700 border-blue-100';
+          if (isOverdue) {
+            badgeClass = 'bg-red-50 text-red-700 border-red-200 font-bold';
+          } else {
+            const diffHours = (new Date(task.dueAt).getTime() - Date.now()) / (1000 * 60 * 60);
+            if (diffHours <= 24) {
+              badgeClass = 'bg-orange-50 text-orange-700 border-orange-200';
+            }
+          }
+
+          return `
+            <div class="bg-white p-4 rounded-xl shadow-sm border ${isOverdue ? 'border-red-300 bg-red-50/20' : 'border-gray-100'} flex items-start justify-between gap-3 transition">
+              <div class="flex items-start gap-3 flex-grow min-w-0">
+                <input type="checkbox" onchange="toggleTask('${task.id}')" class="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer">
+                <div class="space-y-1 flex-grow min-w-0">
+                  <h3 class="text-sm font-medium text-gray-900 break-words">${escapeHTML(task.title)}</h3>${task.memo ? `<p class="text-xs text-gray-500 break-words">${escapeHTML(task.memo)}</p>` : ''}
+                  <div class="flex flex-wrap items-center gap-2 pt-1">
+                    <span class="text-xs px-2 py-0.5 rounded-md border ${badgeClass}">
+                      ${timeText}
+                    </span>
+                    <span class="text-xs text-gray-400">
+                      期限: ${formatDisplayDate(task.dueAt)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <button onclick="openEditModal('${task.id}')" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 text-xs">編集</button>
+                <button onclick="deleteTask('${task.id}')" class="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100 text-xs">削除</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // 完了済みタスクの描画
+      completedHeaderText.textContent = `完了済みタスク (${completedTasks.length})`;
+      if (completedTasks.length === 0) {
+        completedTaskList.innerHTML = `<div class="text-xs text-gray-400 text-center py-2">完了したタスクはありません</div>`;
+      } else {
+        completedTaskList.innerHTML = completedTasks.map(task => `
+          <div class="bg-gray-50 p-3 rounded-lg border border-gray-100 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 flex-grow min-w-0">
+              <input type="checkbox" checked onchange="toggleTask('${task.id}')" class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer">
+              <span class="text-sm text-gray-400 line-through break-words">${escapeHTML(task.title)}</span>
+            </div>
+            <button onclick="deleteTask('${task.id}')" class="p-1 text-gray-400 hover:text-red-600 text-xs shrink-0">削除</button>
+          </div>
+        `).join('');
+      }
+
+      updateNotificationUI();
+    }
+
+    function formatDisplayDate(dateStr) {
+      const d = new Date(dateStr);
+      return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function escapeHTML(str) {
+      return str.replace(/[&<>'`"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+    }
+
+    // グローバル関数（HTML内のonclickから呼び出すため）
+    window.toggleTask = function(id) {
+      const task = tasks.find(t => t.id === id);
+      if (task) {
+        task.completed = !task.completed;
+        task.completedAt = task.completed ? new Date().toISOString() : null;
+        saveAndRender();
+      }
+    };
+
+    window.deleteTask = function(id) {
+      if (confirm('このタスクを削除しますか？')) {
+        tasks = tasks.filter(t => t.id !== id);
+        saveAndRender();
+      }
+    };
+
+    window.openEditModal = function(id) {
+      const task = tasks.find(t => t.id === id);
+      if (task) {
+        editIdInput.value = task.id;
+        editTitleInput.value = task.title;
+        editDueInput.value = task.dueAt;
+        editMemoInput.value = task.memo || '';
+        editModal.classList.remove('hidden');
+      }
+    };
+
+    // 通知チェック
+    function checkReminders() {
+      const now = Date.now();
+      let updated = false;
+
+      tasks.forEach(task => {
+        if (task.completed) return;
+        const dueTime = new Date(task.dueAt).getTime();
+        const diffMinutes = Math.floor((dueTime - now) / (1000 * 60));
+
+        task.remindBefore.forEach(min => {
+          if (diffMinutes <= min && diffMinutes > min - 2 && !task.notified.includes(min)) {
+            task.notified.push(min);
+            updated = true;
+            triggerNotification(task, min);
+          }
+        });
+      });
+
+      if (updated) saveTasks();
+    }
+
+    function triggerNotification(task, min) {
+      const timeStr = min >= 1440 ? `${Math.floor(min / 1440)}日前` : `${Math.floor(min / 60)}時間前`;
+      const message = `「${task.title}」の締め切りが ${timeStr} です！`;
+
+      // ブラウザ通知
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('タスクのリマインド', { body: message });
+      }
+    }
+
+    function checkNotificationPermission() {
+      if ('Notification' in window) {
+        if (Notification.permission === 'default') {
+          requestPermissionBtn.classList.remove('hidden');
+        }
+      }
+    }
+
+    function updateNotificationUI() {
+      // 未完了かつ期限が近い、あるいは期限切れのものを通知バナーのリストに表示
+      const now = Date.now();
+      const alerts = tasks.filter(t => !t.completed && new Date(t.dueAt).getTime() - now < 24 * 60 * 60 * 1000);
+
+      if (alerts.length > 0) {
+        notificationBadge.textContent = alerts.length;
+        notificationBadge.classList.remove('hidden');
+        notificationList.innerHTML = alerts.map(t => `
+          <div class="p-3 text-xs hover:bg-gray-50">
+            <p class="font-medium text-gray-800">${escapeHTML(t.title)}</p>
+            <p class="text-red-600 font-semibold mt-0.5">${getRemainingTimeText(t.dueAt)}</p>
+          </div>
+        `).join('');
+      } else {
+        notificationBadge.classList.add('hidden');
+        notificationList.innerHTML = `<div class="p-4 text-xs text-gray-400 text-center">通知はありません</div>`;
+      }
+    }
+
+    // アプリ起動
+    init();
+  </script>
 </body>
 </html>
