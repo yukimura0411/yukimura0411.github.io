@@ -1,7 +1,7 @@
 {
   "name": "シンプルタスクマネージャー",
   "short_name": "タスク管理",
-  "start_url": "./index.html",
+  "start_url": "./task_manager.html",
   "display": "standalone",
   "background_color": "#f9fafb",
   "theme_color": "#2563eb",
