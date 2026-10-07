@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>シンプルタスク管理アプリ</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
@@ -33,6 +35,15 @@
 
   <!-- メインコンテンツ -->
   <main class="max-w-2xl w-full mx-auto px-4 py-6 flex-grow space-y-6">
+
+    <!-- PWAインストール案内バナー (スマホ用) -->
+    <div id="pwa-install-banner" class="hidden bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-center justify-between gap-3">
+      <div class="text-xs text-blue-800">
+        <p class="font-bold">アプリとしてホーム画面に追加</p>
+        <p class="mt-0.5">Safari/Chromeのメニューから「ホーム画面に追加」を行うと、全画面アプリとして快適に使えます。</p>
+      </div>
+      <button id="dismiss-banner" class="text-blue-500 hover:text-blue-700 text-xs font-bold px-2 py-1">✕</button>
+    </div>
 
     <!-- タスク追加フォーム -->
     <section class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
@@ -121,10 +132,16 @@
 
   <!-- スクリプト -->
   <script>
-    // ローカルストレージのキー
-    const STORAGE_KEY = 'simple_tasks_v1';
+    // Service Workerの登録
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('ServiceWorker registered: ', reg))
+          .catch(err => console.log('ServiceWorker registration failed: ', err));
+      });
+    }
 
-    // 状態管理
+    const STORAGE_KEY = 'simple_tasks_v2';
     let tasks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
     let showCompleted = false;
 
@@ -154,9 +171,7 @@
     const notificationList = document.getElementById('notification-list');
     const requestPermissionBtn = document.getElementById('request-permission-btn');
 
-    // 初期化
     function init() {
-      // 日付の初期値を現在日時の1時間後にセット
       const now = new Date();
       now.setHours(now.getHours() + 1);
       taskDueInput.value = formatDateTimeLocal(now);
@@ -165,14 +180,12 @@
       render();
       checkNotificationPermission();
 
-      // 1分ごとに再描画（残り時間の更新用）
       setInterval(() => {
         render();
         checkReminders();
       }, 60000);
     }
 
-    // 日時を datetime-local 形式に変換
     function formatDateTimeLocal(date) {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -182,55 +195,39 @@
       return `${year}-${month}-${day}T${hours}:${minutes}`;
     }
 
-    // イベントリスナーの設定
     function setupEventListeners() {
       taskForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const title = taskTitleInput.value.trim();
         const dueAt = taskDueInput.value;
         const memo = taskMemoInput.value.trim();
-
         if (!title || !dueAt) return;
 
-        const newTask = {
+        tasks.push({
           id: '_' + Math.random().toString(36).substr(2, 9),
-          title,
-          memo,
-          dueAt,
+          title, memo, dueAt,
           completed: false,
           completedAt: null,
-          remindBefore: [1440, 60], // 24時間前, 1時間前
+          remindBefore: [1440, 60],
           notified: [],
           createdAt: new Date().toISOString()
-        };
-
-        tasks.push(newTask);
+        });
         saveAndRender();
-
-        // フォームリセット
         taskTitleInput.value = '';
         taskMemoInput.value = '';
       });
 
       toggleCompletedBtn.addEventListener('click', () => {
         showCompleted = !showCompleted;
-        if (showCompleted) {
-          completedContainer.classList.remove('hidden');
-          completedArrow.classList.add('rotate-180');
-        } else {
-          completedContainer.classList.add('hidden');
-          completedArrow.classList.remove('rotate-180');
-        }
+        completedContainer.classList.toggle('hidden', !showCompleted);
+        completedArrow.classList.toggle('rotate-180', showCompleted);
       });
 
-      editCancelBtn.addEventListener('click', () => {
-        editModal.classList.add('hidden');
-      });
+      editCancelBtn.addEventListener('click', () => editModal.classList.add('hidden'));
 
       editForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        const id = editIdInput.value;
-        const task = tasks.find(t => t.id === id);
+        const task = tasks.find(t => t.id === editIdInput.value);
         if (task) {
           task.title = editTitleInput.value.trim();
           task.dueAt = editDueInput.value;
@@ -240,12 +237,7 @@
         }
       });
 
-      // 通知ベルの開閉
-      notificationBell.addEventListener('click', () => {
-        notificationDropdown.classList.toggle('hidden');
-      });
-
-      // 外部クリックで通知ドロップダウンを閉じる
+      notificationBell.addEventListener('click', () => notificationDropdown.classList.toggle('hidden'));
       window.addEventListener('click', (e) => {
         if (!notificationBell.contains(e.target) && !notificationDropdown.contains(e.target)) {
           notificationDropdown.classList.add('hidden');
@@ -264,21 +256,13 @@
       });
     }
 
-    function saveTasks() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-    }
+    function saveTasks() { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); }
+    function saveAndRender() { saveTasks(); render(); }
 
-    function saveAndRender() {
-      saveTasks();
-      render();
-    }
-
-    // 残り時間の計算と表示文字列の生成
     function getRemainingTimeText(dueAtStr) {
       const now = new Date();
       const due = new Date(dueAtStr);
-      const diffMs = due.getTime() - now.getTime();
-      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+      const diffMinutes = Math.floor((due.getTime() - now.getTime()) / (1000 * 60));
 
       if (diffMinutes < 0) {
         const absMin = Math.abs(diffMinutes);
@@ -292,80 +276,57 @@
       const days = Math.floor(diffMinutes / (60 * 24));
       const hours = Math.floor((diffMinutes % (60 * 24)) / 60);
       const minutes = diffMinutes % 60;
-
-      if (days > 0) {
-        return `あと ${days}日 ${hours}時間`;
-      } else if (hours > 0) {
-        return `あと ${hours}時間 ${minutes}分`;
-      } else {
-        return `あと ${minutes}分`;
-      }
+      if (days > 0) return `あと ${days}日 ${hours}時間`;
+      if (hours > 0) return `あと ${hours}時間 ${minutes}分`;
+      return `あと ${minutes}分`;
     }
 
-    // 描画処理
     function render() {
-      // 未完了タスクを締め切り順（昇順）に並び替え
-      const activeTasks = tasks.filter(t => !t.completed).sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
-      const completedTasks = tasks.filter(t => t.completed).sort((a, b) => new Date(b.completedAt || 0).getTime() - new Date(a.completedAt || 0).getTime());
+      const activeTasks = tasks.filter(t => !t.completed).sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt));
+      const completedTasks = tasks.filter(t => t.completed).sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
 
-      // 未完了タスクの描画
-      if (activeTasks.length === 0) {
-        activeTaskList.innerHTML = `<div class="p-6 bg-white rounded-xl border border-gray-100 text-center text-sm text-gray-400">タスクはありません</div>`;
-      } else {
-        activeTaskList.innerHTML = activeTasks.map(task => {
+      activeTaskList.innerHTML = activeTasks.length === 0 ? 
+        `<div class="p-6 bg-white rounded-xl border border-gray-100 text-center text-sm text-gray-400">タスクはありません</div>` :
+        activeTasks.map(task => {
           const isOverdue = new Date(task.dueAt).getTime() < Date.now();
           const timeText = getRemainingTimeText(task.dueAt);
-          
-          let badgeClass = 'bg-blue-50 text-blue-700 border-blue-100';
-          if (isOverdue) {
-            badgeClass = 'bg-red-50 text-red-700 border-red-200 font-bold';
-          } else {
-            const diffHours = (new Date(task.dueAt).getTime() - Date.now()) / (1000 * 60 * 60);
-            if (diffHours <= 24) {
-              badgeClass = 'bg-orange-50 text-orange-700 border-orange-200';
-            }
+          let badgeClass = isOverdue ? 'bg-red-50 text-red-700 border-red-200 font-bold' : 'bg-blue-50 text-blue-700 border-blue-100';
+          if (!isOverdue && (new Date(task.dueAt) - Date.now()) <= 24 * 3600 * 1000) {
+            badgeClass = 'bg-orange-50 text-orange-700 border-orange-200';
           }
 
           return `
-            <div class="bg-white p-4 rounded-xl shadow-sm border ${isOverdue ? 'border-red-300 bg-red-50/20' : 'border-gray-100'} flex items-start justify-between gap-3 transition">
+            <div class="bg-white p-4 rounded-xl shadow-sm border ${isOverdue ? 'border-red-300 bg-red-50/20' : 'border-gray-100'} flex items-start justify-between gap-3">
               <div class="flex items-start gap-3 flex-grow min-w-0">
-                <input type="checkbox" onchange="toggleTask('${task.id}')" class="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer">
+                <input type="checkbox" onchange="toggleTask('${task.id}')" class="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300 cursor-pointer">
                 <div class="space-y-1 flex-grow min-w-0">
                   <h3 class="text-sm font-medium text-gray-900 break-words">${escapeHTML(task.title)}</h3>${task.memo ? `<p class="text-xs text-gray-500 break-words">${escapeHTML(task.memo)}</p>` : ''}
                   <div class="flex flex-wrap items-center gap-2 pt-1">
-                    <span class="text-xs px-2 py-0.5 rounded-md border ${badgeClass}">
-                      ${timeText}
-                    </span>
-                    <span class="text-xs text-gray-400">
-                      期限: ${formatDisplayDate(task.dueAt)}
-                    </span>
+                    <span class="text-xs px-2 py-0.5 rounded-md border ${badgeClass}">${timeText}</span>
+                    <span class="text-xs text-gray-400">期限: ${formatDisplayDate(task.dueAt)}</span>
                   </div>
                 </div>
               </div>
               <div class="flex items-center gap-1 shrink-0">
-                <button onclick="openEditModal('${task.id}')" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 text-xs">編集</button>
-                <button onclick="deleteTask('${task.id}')" class="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100 text-xs">削除</button>
+                <button onclick="openEditModal('${task.id}')" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg text-xs">編集</button>
+                <button onclick="deleteTask('${task.id}')" class="p-1.5 text-gray-400 hover:text-red-600 rounded-lg text-xs">削除</button>
               </div>
             </div>
           `;
         }).join('');
-      }
 
-      // 完了済みタスクの描画
       completedHeaderText.textContent = `完了済みタスク (${completedTasks.length})`;
-      if (completedTasks.length === 0) {
-        completedTaskList.innerHTML = `<div class="text-xs text-gray-400 text-center py-2">完了したタスクはありません</div>`;
-      } else {
-        completedTaskList.innerHTML = completedTasks.map(task => `
+      completedTaskList.innerHTML = completedTasks.length === 0 ?
+        `<div class="text-xs text-gray-400 text-center py-2">完了したタスクはありません</div>` :
+        completedTasks.map(task => `
           <div class="bg-gray-50 p-3 rounded-lg border border-gray-100 flex items-center justify-between gap-3">
             <div class="flex items-center gap-3 flex-grow min-w-0">
-              <input type="checkbox" checked onchange="toggleTask('${task.id}')" class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer">
+              <input type="checkbox" checked onchange="toggleTask('${task.id}')" class="w-4 h-4 text-blue-600 rounded border-gray-300 cursor-pointer">
               <span class="text-sm text-gray-400 line-through break-words">${escapeHTML(task.title)}</span>
             </div>
             <button onclick="deleteTask('${task.id}')" class="p-1 text-gray-400 hover:text-red-600 text-xs shrink-0">削除</button>
           </div>
         `).join('');
-      }
 
       updateNotificationUI();
     }
@@ -379,7 +340,6 @@
       return str.replace(/[&<>'`"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
     }
 
-    // グローバル関数（HTML内のonclickから呼び出すため）
     window.toggleTask = function(id) {
       const task = tasks.find(t => t.id === id);
       if (task) {
@@ -407,7 +367,6 @@
       }
     };
 
-    // 通知チェック
     function checkReminders() {
       const now = Date.now();
       let updated = false;
@@ -433,22 +392,24 @@
       const timeStr = min >= 1440 ? `${Math.floor(min / 1440)}日前` : `${Math.floor(min / 60)}時間前`;
       const message = `「${task.title}」の締め切りが ${timeStr} です！`;
 
-      // ブラウザ通知
       if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('タスクのリマインド', { body: message });
-      }
-    }
-
-    function checkNotificationPermission() {
-      if ('Notification' in window) {
-        if (Notification.permission === 'default') {
-          requestPermissionBtn.classList.remove('hidden');
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.ready.then(reg => {
+            reg.showNotification('タスクのリマインド', { body: message, icon: './icon.png' });
+          });
+        } else {
+          new Notification('タスクのリマインド', { body: message });
         }
       }
     }
 
+    function checkNotificationPermission() {
+      if ('Notification' in window && Notification.permission === 'default') {
+        requestPermissionBtn.classList.remove('hidden');
+      }
+    }
+
     function updateNotificationUI() {
-      // 未完了かつ期限が近い、あるいは期限切れのものを通知バナーのリストに表示
       const now = Date.now();
       const alerts = tasks.filter(t => !t.completed && new Date(t.dueAt).getTime() - now < 24 * 60 * 60 * 1000);
 
@@ -467,7 +428,6 @@
       }
     }
 
-    // アプリ起動
     init();
   </script>
 </body>
